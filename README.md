@@ -1,36 +1,73 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Prospect Finder — Pedro Dev
 
-## Getting Started
+App locale mono-utilisateur de prospection : trouve des sites créés par des agences low-cost (local.fr…) via une recherche Google (Serper.dev), enrichit chaque site en fiche prospect exploitable (identité, contacts, mentions légales, CMS, nombre de pages…), gère tout dans un tableau avec anti-doublon, et exporte un JSON propre pour import dans l'ERP FreelanceOS.
 
-First, run the development server:
+C'est la brique **amont** de la skill `prospect-refonte` (audit + refonte Astro).
+
+## Prérequis
+
+- **Node.js ≥ 20** (le projet est développé avec Node 22 — `brew install node@22` ou nvm, cf. `.nvmrc`)
+- Une clé API [Serper.dev](https://serper.dev) (requis)
+- Une clé [PageSpeed Insights](https://developers.google.com/speed/docs/insights/v5/get-started) (optionnel)
+
+## Installation
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+cp .env.example .env      # puis renseigner SERPER_API_KEY
+npm run db:push           # crée prospects.db (SQLite)
+npm run dev               # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Configuration (.env)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Variable | Défaut | Rôle |
+|---|---|---|
+| `SERPER_API_KEY` | — | **Requis.** Clé Serper.dev pour la SERP Google |
+| `PAGESPEED_API_KEY` | — | Clé PageSpeed Insights (si `ENABLE_PAGESPEED=true`) |
+| `ENRICH_CONCURRENCY` | 5 | Sites enrichis en parallèle |
+| `ENRICH_TTL_DAYS` | 7 | Ne pas ré-enrichir un domaine plus récent que N jours (sauf « forcer ») |
+| `REQUEST_TIMEOUT_MS` | 15000 | Timeout par requête HTTP |
+| `ENABLE_PLAYWRIGHT` | false | Fallback headless pour les SPA (`npm i playwright && npx playwright install chromium`) |
+| `ENABLE_PAGESPEED` | false | Score performance mobile pendant l'enrichissement (~30 s/site) |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Workflow
 
-## Learn More
+1. **Recherche** : lancer le dork preset (`"Créé par Local.fr" "Mettre à jour mon site internet" -site:local.fr`) — les URLs sont dédupliquées par domaine enregistrable (`UNIQUE(domain)` en base). Relancer la même recherche plus tard n'ajoute que les nouveaux domaines et affiche le diff.
+2. **Enrichissement** : « Enrichir tout / la sélection / réessayer les échecs ». Fast-path `fetch + Cheerio` (JSON-LD, mentions légales → dirigeant/SIRET, emails/téléphones dé-obfusqués, sitemap → nombre de pages, détection CMS dont local.fr/Solocal). Progression temps réel (SSE). Chaque champ est tracé avec sa source et sa confiance.
+3. **Pipeline commercial** : statut éditable en ligne (nouveau → à contacter → contacté → relance → RDV → client / pas intéressé), notes dans le drawer détail.
+4. **Handoff** : export CSV/JSON, import CSV/JSON en upsert (ne jamais écraser notes ni statut), bouton « Copier le prompt d'import ERP » (prospects sélectionnés, ou tous).
 
-To learn more about Next.js, take a look at the following resources:
+## Scripts
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Script | Rôle |
+|---|---|
+| `npm run dev` | Dev server (Turbopack) |
+| `npm run build` / `npm start` | Build + serveur de prod local |
+| `npm run db:push` | Applique le schéma Drizzle sur `prospects.db` |
+| `npm run db:studio` | Explorateur de base Drizzle Studio |
+| `npm run typecheck` | `tsc --noEmit` |
+| `npx tsx scripts/smoke-test.ts` | Smoke test des extracteurs + pipeline complet |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Architecture
 
-## Deploy on Vercel
+- **Next.js 15 (App Router)** en local — UI React + Route Handlers, pas de déploiement cloud.
+- **SQLite via Drizzle** (`prospects.db`), clé d'unicité = domaine enregistrable normalisé.
+- **Serper.dev** derrière l'interface `SerpProvider` (`lib/serp/`) — switchable vers SerpAPI.
+- **Enrichissement** (`lib/enrich/`) : file `p-queue` (cap 5), respect de `robots.txt`, ~1 s de délai par host, timeout, 2 retries backoff, `User-Agent` identifiable. Playwright uniquement en fallback SPA.
+- **Politesse & RGPD** : données professionnelles B2B uniquement, suppression réelle (droit à l'effacement), rate-limiting poli, opt-out à prévoir dans les messages de démarchage.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Structure
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```
+app/            pages + routes API (search, enrich, enrich/stream SSE, prospects, import, export)
+components/     Dashboard, ActionBar, ProspectTable (TanStack), DetailDrawer, ProgressPanel
+lib/
+  db/           schéma Drizzle + client SQLite
+  serp/         interface SerpProvider + implémentation Serper
+  enrich/       fetcher poli, extracteurs (JSON-LD, emails, téléphones), mentions légales,
+                sitemap, détection CMS/type, runner p-queue, événements SSE
+  importer.ts   import CSV/JSON en upsert
+  exporter.ts   export CSV/JSON
+  erp-prompt.ts prompt d'import ERP
+```
