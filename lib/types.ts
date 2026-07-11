@@ -76,6 +76,16 @@ export const prospectSchema = z.object({
 
 export type Prospect = z.infer<typeof prospectSchema>;
 
+export interface SavedQuery {
+  id: string;
+  query: string;
+  pagesMax: number;
+  createdAt: string;
+  lastRunAt: string | null;
+}
+
+export const DEFAULT_DORK = '"Créé par Local.fr" "Mettre à jour mon site internet" -site:local.fr';
+
 /** Schéma tolérant pour l'import : seuls domain/url sont requis, le reste est complété. */
 export const prospectImportSchema = prospectSchema.partial().extend({
   domain: z.string().optional(),
