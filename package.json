@@ -9,7 +9,9 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "test:smoke": "tsx scripts/smoke-test.ts",
+    "test:import": "tsx scripts/test-import.ts"
   },
   "dependencies": {
     "@tanstack/react-table": "^8.21.3",
@@ -38,6 +40,7 @@
     "eslint": "^9",
     "eslint-config-next": "15.5.20",
     "tailwindcss": "^4",
+    "tsx": "^4.23.0",
     "typescript": "^5"
   }
 }
