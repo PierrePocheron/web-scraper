@@ -35,6 +35,9 @@ interface Props {
 
 const columnHelper = createColumnHelper<Prospect>();
 
+// « Tout » : une seule page assez grande pour contenir toute la base sans pagination.
+const ALL_PAGE_SIZE = 100000;
+
 function TextFilter({ column }: { column: Column<Prospect, unknown> }) {
   return (
     <input
@@ -386,18 +389,22 @@ export default function ProspectTable({
           </button>
         </div>
         <div className="text-zinc-500">
-          Page {table.getState().pagination.pageIndex + 1} / {Math.max(1, table.getPageCount())}
+          {table.getState().pagination.pageSize >= ALL_PAGE_SIZE
+            ? 'Tout affiché'
+            : `Page ${table.getState().pagination.pageIndex + 1} / ${Math.max(1, table.getPageCount())}`}
         </div>
         <select
           value={table.getState().pagination.pageSize}
           onChange={(e) => table.setPageSize(Number(e.target.value))}
           className="rounded border border-zinc-300 px-2 py-1"
         >
-          {[10, 25, 50, 100].map((n) => (
+          {[10, 25, 50, 100, 200, 300].map((n) => (
             <option key={n} value={n}>
               {n} / page
             </option>
           ))}
+          {/* ALL_PAGE_SIZE : tout sur une page, sans casser la pagination TanStack */}
+          <option value={ALL_PAGE_SIZE}>Tout</option>
         </select>
       </div>
     </div>
