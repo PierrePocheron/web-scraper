@@ -137,6 +137,9 @@ export default function DetailDrawer({ prospect, onClose, onPatch, onDelete, onR
           <Field label="Images (estim.)">{prospect.imageCountEstimate}</Field>
           <Field label="Sitemap">{prospect.hasSitemap ? 'oui' : 'non'}</Field>
           <Field label="HTTPS">{prospect.isHttps ? 'oui' : 'non'}</Field>
+          <Field label="Score SEO">
+            {prospect.seoScore !== null ? `${prospect.seoScore} / 100` : null}
+          </Field>
           <Field label="Score perf">{prospect.performanceScore}</Field>
           <Field label="Découvert le">{new Date(prospect.discoveredAt).toLocaleString('fr-FR')}</Field>
           <Field label="Dernier enrichissement">
@@ -144,6 +147,34 @@ export default function DetailDrawer({ prospect, onClose, onPatch, onDelete, onR
           </Field>
           <Field label="Requête source">{prospect.sourceQuery}</Field>
         </div>
+
+        {prospect.seoScore !== null && (
+          <div className="mb-6">
+            <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase text-zinc-400">
+              Analyse SEO on-page
+              <span
+                className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                  prospect.seoScore < 50
+                    ? 'bg-red-100 text-red-700'
+                    : prospect.seoScore < 80
+                      ? 'bg-amber-100 text-amber-700'
+                      : 'bg-emerald-100 text-emerald-700'
+                }`}
+              >
+                {prospect.seoScore} / 100
+              </span>
+            </div>
+            {prospect.seoIssues.length === 0 ? (
+              <div className="text-sm text-zinc-400">Aucun problème détecté.</div>
+            ) : (
+              <ul className="list-disc space-y-0.5 pl-5 text-sm text-red-700">
+                {prospect.seoIssues.map((issue) => (
+                  <li key={issue}>{issue}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
 
         <div className="mb-6">
           <div className="mb-1 text-xs font-medium uppercase text-zinc-400">Notes</div>

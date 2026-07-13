@@ -115,6 +115,8 @@ const EXTRACTION_RESET: Partial<ProspectRow> = {
   imageCountEstimate: null,
   pageCountEstimate: null,
   hasSitemap: false,
+  seoScore: null,
+  seoIssues: [],
   fieldSources: {},
 };
 

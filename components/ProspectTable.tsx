@@ -194,6 +194,23 @@ export default function ProspectTable({
         header: 'Images',
         cell: (info) => info.getValue() ?? '—',
       }),
+      columnHelper.accessor('seoScore', {
+        header: 'SEO',
+        cell: (info) => {
+          const v = info.getValue();
+          if (v === null) return '—';
+          const cls = v < 50 ? 'text-red-600' : v < 80 ? 'text-amber-600' : 'text-emerald-600';
+          const issues = info.row.original.seoIssues;
+          return (
+            <span
+              className={`font-semibold ${cls}`}
+              title={issues.length > 0 ? issues.join('\n') : 'Aucun problème détecté'}
+            >
+              {v}
+            </span>
+          );
+        },
+      }),
       columnHelper.accessor('performanceScore', {
         header: 'Perf',
         cell: (info) => {

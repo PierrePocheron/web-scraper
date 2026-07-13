@@ -69,6 +69,8 @@ export const prospectSchema = z.object({
   hasSitemap: z.boolean(),
   isHttps: z.boolean(),
   performanceScore: z.number().nullable(),
+  seoScore: z.number().nullable(),
+  seoIssues: z.array(z.string()),
   // Traçabilité
   fieldSources: z.record(z.string(), fieldSourceSchema),
   // Pipeline commercial

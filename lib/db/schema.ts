@@ -34,6 +34,8 @@ export const prospects = sqliteTable('prospects', {
   hasSitemap: integer('has_sitemap', { mode: 'boolean' }).notNull().default(false),
   isHttps: integer('is_https', { mode: 'boolean' }).notNull().default(false),
   performanceScore: integer('performance_score'),
+  seoScore: integer('seo_score'),
+  seoIssues: text('seo_issues', { mode: 'json' }).$type<string[]>().notNull().default([]),
   // Traçabilité
   fieldSources: text('field_sources', { mode: 'json' })
     .$type<Record<string, FieldSource>>()

@@ -17,6 +17,7 @@ import { detectCms, detectLocalFr, detectSiteType } from './detect';
 import { fetchPage } from './fetcher';
 import { fetchLegalPage, splitPersonName } from './legal';
 import { getPerformanceScore } from './pagespeed';
+import { computeSeoScore } from './seo';
 import { estimatePageCount, internalLinks } from './sitemap';
 import { isSpaShell, renderWithPlaywright } from './spa';
 
@@ -214,6 +215,14 @@ export async function enrichProspect(
   const linkCount = internalLinks($, home.finalUrl).length;
   const siteType = detectSiteType($, html, cmsDetection.ecommerceHint, linkCount);
   set('siteType', siteType, 'signaux home', siteType === 'vitrine' ? 'medium' : 'high');
+
+  // --- 7 bis. Score SEO on-page (gratuit, calculé depuis la home) ---
+  const seo = computeSeoScore($, {
+    isHttps: updates.isHttps ?? false,
+    hasSitemap: updates.hasSitemap ?? false,
+  });
+  set('seoScore', seo.score, 'analyse on-page', 'high');
+  updates.seoIssues = seo.issues;
 
   // --- 8. PageSpeed (optionnel) ---
   const perf = await getPerformanceScore(home.finalUrl);

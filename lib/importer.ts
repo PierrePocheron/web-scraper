@@ -103,6 +103,8 @@ export function importContent(content: string, format: 'csv' | 'json'): ImportRe
           hasSitemap: candidate.hasSitemap ?? false,
           isHttps: candidate.isHttps ?? false,
           performanceScore: candidate.performanceScore ?? null,
+          seoScore: candidate.seoScore ?? null,
+          seoIssues: candidate.seoIssues ?? [],
           fieldSources: candidate.fieldSources ?? {},
           outreachStatus: candidate.outreachStatus ?? 'nouveau',
           notes: str(candidate.notes) || null,
@@ -142,6 +144,8 @@ interface Candidate {
   hasSitemap?: boolean;
   isHttps?: boolean;
   performanceScore?: number;
+  seoScore?: number;
+  seoIssues?: string[];
   fieldSources?: Record<string, FieldSource>;
   outreachStatus?: OutreachStatus;
   notes?: string;
@@ -222,6 +226,8 @@ function normalizeRecord(raw: RawRecord): Candidate {
     hasSitemap: toBool(raw.hasSitemap),
     isHttps: toBool(raw.isHttps),
     performanceScore: toNum(raw.performanceScore),
+    seoScore: toNum(raw.seoScore),
+    seoIssues: toList(raw.seoIssues),
     fieldSources: toFieldSources(raw.fieldSources),
     outreachStatus: toEnum(raw.outreachStatus, OUTREACH_STATUSES),
     notes: str(raw.notes) || undefined,
@@ -257,6 +263,8 @@ function fillEmptyFields(existing: ProspectRow, candidate: Candidate): Partial<P
     'imageCountEstimate',
     'pageCountEstimate',
     'performanceScore',
+    'seoScore',
+    'seoIssues',
     'fieldSources',
   ] as const;
 
