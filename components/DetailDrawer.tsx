@@ -128,7 +128,13 @@ export default function DetailDrawer({ prospect, onClose, onPatch, onDelete, onR
           </Field>
           <Field label="Type de site">{prospect.siteType}</Field>
           <Field label="CMS">{prospect.cms}</Field>
+          <Field label="Domaine créé le">
+            {prospect.domainCreatedAt
+              ? new Date(prospect.domainCreatedAt).toLocaleDateString('fr-FR')
+              : null}
+          </Field>
           <Field label="Pages (estim.)">{prospect.pageCountEstimate}</Field>
+          <Field label="Images (estim.)">{prospect.imageCountEstimate}</Field>
           <Field label="Sitemap">{prospect.hasSitemap ? 'oui' : 'non'}</Field>
           <Field label="HTTPS">{prospect.isHttps ? 'oui' : 'non'}</Field>
           <Field label="Score perf">{prospect.performanceScore}</Field>

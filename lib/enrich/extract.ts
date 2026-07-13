@@ -9,6 +9,8 @@ export interface JsonLdBusiness {
   telephone: string | null;
   email: string | null;
   address: string | null;
+  /** fondateur / dirigeant déclaré dans le schema.org */
+  founder: string | null;
 }
 
 interface LdNode {
@@ -18,10 +20,18 @@ interface LdNode {
   description?: string;
   telephone?: string;
   email?: string;
+  founder?: string | { name?: string } | Array<string | { name?: string }>;
   address?:
     | string
     | { streetAddress?: string; postalCode?: string; addressLocality?: string };
   [key: string]: unknown;
+}
+
+function founderName(founder: LdNode['founder']): string | null {
+  const first = Array.isArray(founder) ? founder[0] : founder;
+  if (!first) return null;
+  if (typeof first === 'string') return first.trim() || null;
+  return first.name?.trim() || null;
 }
 
 const BUSINESS_TYPES = /LocalBusiness|Organization|Store|Restaurant|Dentist|Physician|Attorney|Plumber|Electrician|HairSalon|Bakery|AutoRepair|RoofingContractor|GeneralContractor|HomeAndConstructionBusiness|FoodEstablishment|MedicalBusiness|LegalService|RealEstateAgent|Florist|Hotel|LodgingBusiness|ProfessionalService/i;
@@ -72,6 +82,7 @@ export function extractJsonLd($: CheerioAPI): JsonLdBusiness | null {
     address = parts.join(', ') || null;
   }
 
+  const founder = founderName(business.founder);
   return {
     name: business.name ? decodeEntities(business.name) : null,
     type: rawType ?? null,
@@ -79,6 +90,7 @@ export function extractJsonLd($: CheerioAPI): JsonLdBusiness | null {
     telephone: business.telephone ?? null,
     email: business.email ?? null,
     address: address ? decodeEntities(address) : null,
+    founder: founder ? decodeEntities(founder) : null,
   };
 }
 
@@ -172,6 +184,28 @@ export function extractDescription($: CheerioAPI): { value: string; source: stri
     if (text.length >= 80) found = text.slice(0, 500);
   });
   return found ? { value: found, source: 'homepage:p' } : null;
+}
+
+// --- Images ---------------------------------------------------------------------
+
+/** Nombre approximatif d'images sur la page (src uniques, lazy-loading inclus, icônes exclues). */
+export function countImages($: CheerioAPI): number {
+  const seen = new Set<string>();
+  let anonymous = 0;
+  $('img, source[srcset], [style*="background-image"]').each((_, el) => {
+    const $el = $(el);
+    const src =
+      $el.attr('src') ||
+      $el.attr('data-src') ||
+      $el.attr('data-lazy-src') ||
+      $el.attr('srcset')?.split(/[\s,]/)[0] ||
+      $el.attr('style')?.match(/background-image\s*:\s*url\(['"]?([^'")]+)/i)?.[1] ||
+      '';
+    if (/\.svg|icon|logo-?small|pixel|spacer|1x1/i.test(src)) return;
+    if (src) seen.add(src.trim());
+    else if (el.tagName === 'img') anonymous++;
+  });
+  return seen.size + anonymous;
 }
 
 // --- Emails --------------------------------------------------------------------

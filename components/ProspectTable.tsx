@@ -90,6 +90,19 @@ export default function ProspectTable({
   const columns = useMemo(
     () => [
       columnHelper.display({
+        id: 'num',
+        header: '#',
+        cell: ({ row, table }) => {
+          const pageRows = table.getRowModel().rows;
+          const idx = pageRows.findIndex((r) => r.id === row.id);
+          const { pageIndex, pageSize } = table.getState().pagination;
+          return (
+            <span className="tabular-nums text-zinc-400">{pageIndex * pageSize + idx + 1}</span>
+          );
+        },
+        size: 40,
+      }),
+      columnHelper.display({
         id: 'select',
         header: ({ table }) => (
           <input
@@ -163,8 +176,19 @@ export default function ProspectTable({
         cell: (info) => info.getValue() ?? '—',
         meta: { filter: 'text' },
       }),
+      columnHelper.accessor('domainCreatedAt', {
+        header: 'Domaine créé',
+        cell: (info) => {
+          const v = info.getValue();
+          return v ? new Date(v).getFullYear() : '—';
+        },
+      }),
       columnHelper.accessor('pageCountEstimate', {
         header: 'Pages',
+        cell: (info) => info.getValue() ?? '—',
+      }),
+      columnHelper.accessor('imageCountEstimate', {
+        header: 'Images',
         cell: (info) => info.getValue() ?? '—',
       }),
       columnHelper.accessor('performanceScore', {

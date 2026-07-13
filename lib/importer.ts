@@ -97,6 +97,8 @@ export function importContent(content: string, format: 'csv' | 'json'): ImportRe
           legalNoticeUrl: str(candidate.legalNoticeUrl) || null,
           siteType: candidate.siteType ?? 'inconnu',
           cms: str(candidate.cms) || null,
+          domainCreatedAt: str(candidate.domainCreatedAt) || null,
+          imageCountEstimate: candidate.imageCountEstimate ?? null,
           pageCountEstimate: candidate.pageCountEstimate ?? null,
           hasSitemap: candidate.hasSitemap ?? false,
           isHttps: candidate.isHttps ?? false,
@@ -134,6 +136,8 @@ interface Candidate {
   legalNoticeUrl?: string;
   siteType?: SiteType;
   cms?: string;
+  domainCreatedAt?: string;
+  imageCountEstimate?: number;
   pageCountEstimate?: number;
   hasSitemap?: boolean;
   isHttps?: boolean;
@@ -212,6 +216,8 @@ function normalizeRecord(raw: RawRecord): Candidate {
     legalNoticeUrl: str(raw.legalNoticeUrl) || undefined,
     siteType: toEnum(raw.siteType, SITE_TYPES),
     cms: str(raw.cms) || undefined,
+    domainCreatedAt: str(raw.domainCreatedAt) || undefined,
+    imageCountEstimate: toNum(raw.imageCountEstimate),
     pageCountEstimate: toNum(raw.pageCountEstimate),
     hasSitemap: toBool(raw.hasSitemap),
     isHttps: toBool(raw.isHttps),
@@ -247,6 +253,8 @@ function fillEmptyFields(existing: ProspectRow, candidate: Candidate): Partial<P
     'siret',
     'legalNoticeUrl',
     'cms',
+    'domainCreatedAt',
+    'imageCountEstimate',
     'pageCountEstimate',
     'performanceScore',
     'fieldSources',

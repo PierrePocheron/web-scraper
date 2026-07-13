@@ -63,6 +63,8 @@ export const prospectSchema = z.object({
   // Site
   siteType: z.enum(SITE_TYPES),
   cms: z.string().nullable(),
+  domainCreatedAt: z.string().nullable(),
+  imageCountEstimate: z.number().nullable(),
   pageCountEstimate: z.number().nullable(),
   hasSitemap: z.boolean(),
   isHttps: z.boolean(),

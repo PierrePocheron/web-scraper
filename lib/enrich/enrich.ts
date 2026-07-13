@@ -3,6 +3,7 @@ import type { prospects } from '@/lib/db/schema';
 import type { Confidence, FieldSource } from '@/lib/types';
 import {
   businessTypeLabel,
+  countImages,
   deduceCategory,
   extractDescription,
   extractEmails,
@@ -11,6 +12,7 @@ import {
   extractSiteName,
   normalizePhoneFr,
 } from './extract';
+import { getDomainCreationDate } from './rdap';
 import { detectCms, detectLocalFr, detectSiteType } from './detect';
 import { fetchPage } from './fetcher';
 import { fetchLegalPage, splitPersonName } from './legal';
@@ -97,11 +99,15 @@ export async function enrichProspect(
   if (legal.publicationManager) {
     set('publicationManager', legal.publicationManager, 'mentions-legales', 'medium');
   }
-  const dirigeant = legal.gerant ?? legal.publicationManager;
+  // contact prioritaire : fondateur JSON-LD (or) > gérant > responsable de publication
+  const dirigeant = ld?.founder ?? legal.gerant ?? legal.publicationManager;
   if (dirigeant) {
+    const contactSource = ld?.founder ? 'jsonld:founder' : 'mentions-legales';
     const { firstName, lastName } = splitPersonName(dirigeant);
-    if (firstName) set('contactFirstName', firstName, 'mentions-legales', 'medium');
-    if (lastName) set('contactLastName', lastName, 'mentions-legales', 'medium');
+    if (firstName)
+      set('contactFirstName', firstName, contactSource, ld?.founder ? 'high' : 'medium');
+    if (lastName)
+      set('contactLastName', lastName, contactSource, ld?.founder ? 'high' : 'medium');
   }
   if (legal.siret) set('siret', legal.siret, 'mentions-legales', 'high');
   if (!updates.address && legal.address) {
@@ -181,6 +187,13 @@ export async function enrichProspect(
   if (phones.length > 0) {
     set('phones', phones, phoneSource!, phoneSource === 'homepage' ? 'medium' : 'high');
   }
+
+  // --- 5 bis. Images + date de création du domaine ---
+  const imageCount = countImages($);
+  set('imageCountEstimate', imageCount, 'home:img', 'medium');
+
+  const domainCreated = await getDomainCreationDate(prospect.domain);
+  if (domainCreated) set('domainCreatedAt', domainCreated, 'rdap', 'high');
 
   // --- 6. Sitemap / nombre de pages ---
   const pages = await estimatePageCount(home.finalUrl, $);

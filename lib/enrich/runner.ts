@@ -111,6 +111,8 @@ const EXTRACTION_RESET: Partial<ProspectRow> = {
   legalNoticeUrl: null,
   siteType: 'inconnu',
   cms: null,
+  domainCreatedAt: null,
+  imageCountEstimate: null,
   pageCountEstimate: null,
   hasSitemap: false,
   fieldSources: {},

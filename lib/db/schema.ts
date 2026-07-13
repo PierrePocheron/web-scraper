@@ -28,6 +28,8 @@ export const prospects = sqliteTable('prospects', {
   // Site
   siteType: text('site_type').notNull().default('inconnu'),
   cms: text('cms'),
+  domainCreatedAt: text('domain_created_at'),
+  imageCountEstimate: integer('image_count_estimate'),
   pageCountEstimate: integer('page_count_estimate'),
   hasSitemap: integer('has_sitemap', { mode: 'boolean' }).notNull().default(false),
   isHttps: integer('is_https', { mode: 'boolean' }).notNull().default(false),
