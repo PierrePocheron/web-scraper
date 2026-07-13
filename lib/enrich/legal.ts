@@ -8,8 +8,32 @@ const PUB_MANAGER_RE =
 const GERANT_RE =
   /g[ée]rant[e]?\s*[:\-–]?\s*([A-ZÉÈÀ][\wÀ-ÿ'’\-]+(?:\s+[A-ZÉÈÀ][\wÀ-ÿ'’\-]+){0,3})/i;
 const SIRET_RE = /\b\d{3}\s?\d{3}\s?\d{3}\s?\d{5}\b/;
-// "12 rue des Lilas, 69003 Lyon"
-const ADDRESS_RE = /\d{1,4}[,]?\s+(?:rue|avenue|av\.|boulevard|bd|chemin|impasse|place|route|allée|quai|cours)\s[^,\n<]{3,60}[,\s]+\d{5}\s+[A-ZÀ-Ÿ][\wÀ-ÿ\-' ]{2,40}/i;
+// "12 rue des Lilas, 69003 Lyon" — ville : mots capitalisés + connecteurs ("Mont de Marsan", "La Marne")
+const ADDRESS_RE =
+  /\d{1,4}[,]?\s+(?:rue|avenue|av\.|boulevard|bd|chemin|impasse|place|route|allée|quai|cours)\s[^,\n<]{3,60}[,\s]+\d{5}\s+[A-ZÀ-Ÿ][A-Za-zà-ÿÀ-Ÿ\-']+(?:\s+(?:de|du|des|la|le|les|sur|sous|en|aux|et)\b|\s+[A-ZÀ-Ÿ][A-Za-zà-ÿÀ-Ÿ\-']+){0,4}/;
+// connecteurs orphelins en fin de ville ("Lyon et" → "Lyon")
+const TRAILING_CONNECTOR_RE = /(?:\s+(?:de|du|des|la|le|les|sur|sous|en|aux|et))+$/;
+// mots-clés légaux qui suivent souvent le nom du dirigeant dans la capture
+const NAME_TRAILING_JUNK_RE =
+  /\s+(?:siren|siret|rcs|tva|sas|sasu|sarl|eurl|sci|capital|adresse|t[ée]l|email|e-mail|courriel|num[ée]ro|soci[ée]t[ée]|immatricul\w*|domicili\w*|contact|h[ée]berg\w*)\b[\s\S]*$/i;
+
+function cleanPersonName(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const cleaned = raw.replace(NAME_TRAILING_JUNK_RE, '').trim();
+  return cleaned || null;
+}
+
+/** Adresse hors contexte hébergeur (OVH & co apparaissent dans les mentions légales). */
+function extractLegalAddress(text: string): string | null {
+  const re = new RegExp(ADDRESS_RE.source, 'g');
+  for (const match of text.matchAll(re)) {
+    const before = text.slice(Math.max(0, (match.index ?? 0) - 150), match.index).toLowerCase();
+    if (/h[ée]berg|ovh|o2switch|ionos|gandi|scaleway|amen\b/.test(before)) continue;
+    if (/kellermann/i.test(match[0])) continue; // 2 rue Kellermann = OVH
+    return match[0].trim().replace(TRAILING_CONNECTOR_RE, '');
+  }
+  return null;
+}
 
 const LEGAL_FALLBACK_PATHS = [
   '/mentions-legales',
@@ -79,10 +103,10 @@ export async function fetchLegalPage($home: CheerioAPI, baseUrl: string): Promis
       const text = $('body').text().replace(/\s+/g, ' ');
       return {
         legalNoticeUrl: res.finalUrl,
-        publicationManager: text.match(PUB_MANAGER_RE)?.[1]?.trim() ?? null,
-        gerant: text.match(GERANT_RE)?.[1]?.trim() ?? null,
+        publicationManager: cleanPersonName(text.match(PUB_MANAGER_RE)?.[1]),
+        gerant: cleanPersonName(text.match(GERANT_RE)?.[1]),
         siret: text.match(SIRET_RE)?.[0]?.replace(/\s/g, '') ?? null,
-        address: text.match(ADDRESS_RE)?.[0]?.trim() ?? null,
+        address: extractLegalAddress(text),
         $legal: $,
         legalHtml: res.html,
       };

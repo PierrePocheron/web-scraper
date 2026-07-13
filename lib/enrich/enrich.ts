@@ -11,7 +11,7 @@ import {
   extractSiteName,
   normalizePhoneFr,
 } from './extract';
-import { detectCms, detectSiteType } from './detect';
+import { detectCms, detectLocalFr, detectSiteType } from './detect';
 import { fetchPage } from './fetcher';
 import { fetchLegalPage, splitPersonName } from './legal';
 import { getPerformanceScore } from './pagespeed';
@@ -44,9 +44,10 @@ export async function enrichProspect(
     fieldSources[field as string] = { source, confidence };
   };
 
-  // --- 1. Home (fast-path) ---
+  // --- 1. Home (fast-path) — depuis la racine : la SERP pointe souvent une page profonde ---
+  const rootUrl = new URL(prospect.url).origin + '/';
   onStep('fetch');
-  const home = await fetchPage(prospect.url);
+  const home = await fetchPage(rootUrl);
   if (!home.ok) throw new Error(`HTTP ${home.status} sur la page d'accueil`);
   let html = home.html;
   let $ = cheerio.load(html);
@@ -191,7 +192,12 @@ export async function enrichProspect(
 
   // --- 7. CMS + type de site ---
   const cmsDetection = detectCms($, html, home.headers);
-  if (cmsDetection.cms) set('cms', cmsDetection.cms, 'empreintes html/headers', 'high');
+  if (cmsDetection.cms) {
+    set('cms', cmsDetection.cms, 'empreintes html/headers', 'high');
+  } else if (legal.$legal && detectLocalFr(legal.$legal('body').text())) {
+    // la mention « Créé par Local.fr » vit souvent sur la page mentions légales
+    set('cms', 'local.fr / Solocal', 'mentions-legales', 'high');
+  }
   const linkCount = internalLinks($, home.finalUrl).length;
   const siteType = detectSiteType($, html, cmsDetection.ecommerceHint, linkCount);
   set('siteType', siteType, 'signaux home', siteType === 'vitrine' ? 'medium' : 'high');

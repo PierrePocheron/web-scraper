@@ -94,6 +94,28 @@ async function runBatch(targets: ProspectRow[]) {
   console.log(`[enrich] run terminé : ${state.done} ok, ${state.failed} échec(s) / ${state.total}`);
 }
 
+// Remise à zéro des champs extraits avant ré-application : évite de garder des valeurs
+// obsolètes d'un run précédent. performanceScore exclu (optionnel, on garde le dernier connu).
+const EXTRACTION_RESET: Partial<ProspectRow> = {
+  businessName: null,
+  businessType: null,
+  businessDescription: null,
+  category: null,
+  contactFirstName: null,
+  contactLastName: null,
+  publicationManager: null,
+  emails: [],
+  phones: [],
+  address: null,
+  siret: null,
+  legalNoticeUrl: null,
+  siteType: 'inconnu',
+  cms: null,
+  pageCountEstimate: null,
+  hasSitemap: false,
+  fieldSources: {},
+};
+
 /** Enrichit un site. Un échec ne bloque jamais le lot. */
 async function enrichOne(row: ProspectRow) {
   const startedAt = Date.now();
@@ -108,6 +130,7 @@ async function enrichOne(row: ProspectRow) {
     );
     db.update(prospects)
       .set({
+        ...EXTRACTION_RESET,
         ...updates,
         enrichmentStatus: 'done',
         enrichmentError: null,

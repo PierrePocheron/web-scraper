@@ -6,14 +6,22 @@ export interface CmsDetection {
   ecommerceHint: boolean;
 }
 
+// « Créé par Local.fr » (souvent sur la page mentions légales), assets/emails Solocal
+const LOCAL_FR_RE = /cr[ée]{1,2}\s+par\s+local\.fr|solocal|\.local\.fr\b/i;
+
+/** Détecte l'empreinte local.fr/Solocal dans du texte décodé (home ou mentions légales). */
+export function detectLocalFr(text: string): boolean {
+  return LOCAL_FR_RE.test(text);
+}
+
 /** Détection CMS par generator, headers et empreintes d'assets. */
 export function detectCms($: CheerioAPI, html: string, headers: Headers): CmsDetection {
   const generator = $('meta[name="generator"]').attr('content')?.toLowerCase() ?? '';
   const h = html.toLowerCase();
   const powered = headers.get('x-powered-by')?.toLowerCase() ?? '';
 
-  // local.fr / Solocal — la cible du dork
-  if (/cr[ée]{1,2} par local\.fr|solocal/i.test(html) || generator.includes('local.fr')) {
+  // local.fr / Solocal — la cible du dork (texte décodé : gère les entités HTML)
+  if (detectLocalFr(html) || detectLocalFr($('body').text()) || generator.includes('local.fr')) {
     return { cms: 'local.fr / Solocal', ecommerceHint: false };
   }
   if (generator.includes('prestashop') || h.includes('powered by prestashop') || h.includes('id_product=')) {

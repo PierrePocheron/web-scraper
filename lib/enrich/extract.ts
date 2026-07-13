@@ -62,10 +62,14 @@ export function extractJsonLd($: CheerioAPI): JsonLdBusiness | null {
     address = business.address;
   } else if (business.address && typeof business.address === 'object') {
     const a = business.address;
-    address =
-      [a.streetAddress, [a.postalCode, a.addressLocality].filter(Boolean).join(' ')]
-        .filter(Boolean)
-        .join(', ') || null;
+    const parts: string[] = [];
+    if (a.streetAddress) parts.push(a.streetAddress);
+    const cityLine = [a.postalCode, a.addressLocality].filter(Boolean).join(' ');
+    // évite "17 Rue X, 44270 La Marne, 44270 La Marne" quand streetAddress contient déjà CP+ville
+    if (cityLine && (!a.postalCode || !(a.streetAddress ?? '').includes(a.postalCode))) {
+      parts.push(cityLine);
+    }
+    address = parts.join(', ') || null;
   }
 
   return {
@@ -126,17 +130,21 @@ export function deduceCategory(businessType: string | null): string | null {
 
 // --- Identité / description ---------------------------------------------------
 
+// titres parasites : bandeau cookies, pages légales (fréquents sur les sites local.fr)
+const JUNK_NAME_RE =
+  /rgpd|cookies?|mentions?\s+l[ée]gales|l[ée]gislation|confidentialit|politique|donn[ée]es personnelles|accueil$/i;
+
 export function extractSiteName($: CheerioAPI): { value: string; source: string } | null {
   const og = $('meta[property="og:site_name"]').attr('content')?.trim();
-  if (og) return { value: og, source: 'og:site_name' };
-  const h1 = $('h1').first().text().trim();
-  if (h1 && h1.length <= 80) return { value: h1, source: 'h1' };
+  if (og && !JUNK_NAME_RE.test(og)) return { value: og, source: 'og:site_name' };
   const title = $('title').first().text().trim();
   if (title) {
     // coupe les suffixes type " - Accueil" / " | Plombier Lyon"
     const cleaned = title.split(/\s*[|–-]\s*/)[0].trim();
-    return { value: cleaned || title, source: 'title' };
+    if (cleaned && !JUNK_NAME_RE.test(cleaned)) return { value: cleaned, source: 'title' };
   }
+  const h1 = $('h1').first().text().trim();
+  if (h1 && h1.length <= 80 && !JUNK_NAME_RE.test(h1)) return { value: h1, source: 'h1' };
   return null;
 }
 
@@ -158,7 +166,8 @@ export function extractDescription($: CheerioAPI): { value: string; source: stri
 
 const EMAIL_RE = /[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}/gi;
 const EMAIL_VALID_RE = /^[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}$/i;
-const EMAIL_BLACKLIST = /noreply|no-reply|sentry|wixpress|example\.|@2x|\.(png|jpe?g|gif|webp|svg|ico|css|js)$/i;
+const EMAIL_BLACKLIST =
+  /noreply|no-reply|sentry|wixpress|example\.|@2x|\.(png|jpe?g|gif|webp|svg|ico|css|js)$|@(?:[a-z0-9.\-]+\.)?local\.fr$/i;
 
 /** Décode l'obfuscation Cloudflare data-cfemail. */
 function decodeCfEmail(hex: string): string | null {
@@ -217,6 +226,9 @@ export function normalizePhoneFr(raw: string): string | null {
   return `+33 ${digits[0]} ${pairs.join(' ')}`;
 }
 
+// numéros de prestataires qui traînent dans les mentions légales (OVH, AFNIC)
+const PHONE_BLACKLIST = new Set(['+33 9 72 10 10 07', '+33 1 43 98 77 00']);
+
 export function extractPhones($: CheerioAPI, html: string): string[] {
   const found: string[] = [];
   // 1. hrefs tel: (prioritaires)
@@ -229,6 +241,6 @@ export function extractPhones($: CheerioAPI, html: string): string[] {
 
   const normalized = found
     .map(normalizePhoneFr)
-    .filter((p): p is string => p !== null);
+    .filter((p): p is string => p !== null && !PHONE_BLACKLIST.has(p));
   return [...new Set(normalized)];
 }
