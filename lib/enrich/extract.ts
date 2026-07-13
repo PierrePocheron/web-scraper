@@ -73,12 +73,12 @@ export function extractJsonLd($: CheerioAPI): JsonLdBusiness | null {
   }
 
   return {
-    name: business.name ?? null,
+    name: business.name ? decodeEntities(business.name) : null,
     type: rawType ?? null,
-    description: business.description ?? null,
+    description: business.description ? decodeEntities(business.description) : null,
     telephone: business.telephone ?? null,
     email: business.email ?? null,
-    address,
+    address: address ? decodeEntities(address) : null,
   };
 }
 
@@ -130,20 +130,32 @@ export function deduceCategory(businessType: string | null): string | null {
 
 // --- Identité / description ---------------------------------------------------
 
-// titres parasites : bandeau cookies, pages légales (fréquents sur les sites local.fr)
+// titres parasites : bandeau cookies, pages légales, placeholders (fréquents sur les sites local.fr)
 const JUNK_NAME_RE =
-  /rgpd|cookies?|mentions?\s+l[ée]gales|l[ée]gislation|confidentialit|politique|donn[ée]es personnelles|accueil$/i;
+  /rgpd|cookies?|mentions?\s+l[ée]gales|l[ée]gislation|confidentialit|politique|donn[ée]es personnelles|accueil$|^welcome\s*!?$|^bienvenue\s*!?$|^home$/i;
+
+/** Décode les entités HTML résiduelles (sites qui double-encodent : "L&#039;OSTERIA"). */
+function decodeEntities(s: string): string {
+  return s
+    .replace(/&#0?39;|&apos;|&#x27;/gi, "'")
+    .replace(/&quot;/gi, '"')
+    .replace(/&amp;/gi, '&')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&eacute;/gi, 'é')
+    .replace(/&egrave;/gi, 'è')
+    .replace(/&agrave;/gi, 'à');
+}
 
 export function extractSiteName($: CheerioAPI): { value: string; source: string } | null {
-  const og = $('meta[property="og:site_name"]').attr('content')?.trim();
+  const og = decodeEntities($('meta[property="og:site_name"]').attr('content')?.trim() ?? '');
   if (og && !JUNK_NAME_RE.test(og)) return { value: og, source: 'og:site_name' };
-  const title = $('title').first().text().trim();
+  const title = decodeEntities($('title').first().text().trim());
   if (title) {
     // coupe les suffixes type " - Accueil" / " | Plombier Lyon"
     const cleaned = title.split(/\s*[|–-]\s*/)[0].trim();
     if (cleaned && !JUNK_NAME_RE.test(cleaned)) return { value: cleaned, source: 'title' };
   }
-  const h1 = $('h1').first().text().trim();
+  const h1 = decodeEntities($('h1').first().text().trim());
   if (h1 && h1.length <= 80 && !JUNK_NAME_RE.test(h1)) return { value: h1, source: 'h1' };
   return null;
 }

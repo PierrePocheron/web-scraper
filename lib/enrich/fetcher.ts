@@ -92,6 +92,20 @@ export async function fetchPage(url: string): Promise<FetchResult> {
       lastError = err;
     }
   }
-  const msg = lastError instanceof Error ? lastError.message : String(lastError);
-  throw new Error(`Échec réseau sur ${url} : ${msg}`);
+  throw new Error(`Échec réseau sur ${url} : ${describeError(lastError)}`);
+}
+
+/** Déplie la cause des erreurs undici ("fetch failed" → code TLS/DNS exploitable). */
+function describeError(err: unknown): string {
+  if (!(err instanceof Error)) return String(err);
+  if (err.name === 'TimeoutError') return `timeout après ${config.requestTimeoutMs}ms`;
+  const cause = (err as { cause?: unknown }).cause;
+  if (cause instanceof Error) {
+    const code = (cause as { code?: string }).code;
+    if (code === 'ERR_TLS_CERT_ALTNAME_INVALID' || /certificate/i.test(cause.message)) {
+      return `certificat SSL invalide (${cause.message.slice(0, 120)})`;
+    }
+    return code ? `${code} — ${cause.message.slice(0, 120)}` : cause.message.slice(0, 150);
+  }
+  return err.message;
 }
