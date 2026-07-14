@@ -1,6 +1,6 @@
 # Prospect Finder — Pedro Dev
 
-App locale mono-utilisateur de prospection : trouve des sites créés par des agences low-cost (local.fr…) via une recherche Google (Serper.dev), enrichit chaque site en fiche prospect exploitable (identité, contacts, mentions légales, CMS, nombre de pages…), gère tout dans un tableau avec anti-doublon, et exporte un JSON propre pour import dans l'ERP FreelanceOS.
+App locale mono-utilisateur de prospection : trouve des sites créés par des agences low-cost (local.fr…) via une recherche Google (Serper.dev), enrichit chaque site en fiche prospect exploitable (identité, contacts, mentions légales, CMS, **score SEO**, nombre de pages/images, date de création du domaine…), gère tout dans un tableau avec anti-doublon, et exporte un JSON propre pour import dans l'ERP FreelanceOS.
 
 C'est la brique **amont** de la skill `prospect-refonte` (audit + refonte Astro).
 
@@ -19,6 +19,9 @@ npm run db:push           # crée prospects.db (SQLite)
 npm run dev               # http://localhost:3000
 ```
 
+> Node 22 requis. Si `node -v` affiche une version plus ancienne :
+> `export PATH=/opt/homebrew/opt/node@22/bin:$PATH` (ou `nvm use`).
+
 ## Configuration (.env)
 
 | Variable | Défaut | Rôle |
@@ -31,12 +34,41 @@ npm run dev               # http://localhost:3000
 | `ENABLE_PLAYWRIGHT` | false | Fallback headless pour les SPA (`npm i playwright && npx playwright install chromium`) |
 | `ENABLE_PAGESPEED` | false | Score performance mobile pendant l'enrichissement (~30 s/site) |
 
-## Workflow
+## Utilisation
 
-1. **Recherche** : lancer le dork preset (`"Créé par Local.fr" "Mettre à jour mon site internet" -site:local.fr`) — les URLs sont dédupliquées par domaine enregistrable (`UNIQUE(domain)` en base). Relancer la même recherche plus tard n'ajoute que les nouveaux domaines et affiche le diff.
-2. **Enrichissement** : « Enrichir tout / la sélection / réessayer les échecs ». Fast-path `fetch + Cheerio` (JSON-LD, mentions légales → dirigeant/SIRET, emails/téléphones dé-obfusqués, sitemap → nombre de pages, détection CMS dont local.fr/Solocal). Progression temps réel (SSE). Chaque champ est tracé avec sa source et sa confiance.
-3. **Pipeline commercial** : statut éditable en ligne (nouveau → à contacter → contacté → relance → RDV → client / pas intéressé), notes dans le drawer détail.
-4. **Handoff** : export CSV/JSON, import CSV/JSON en upsert (ne jamais écraser notes ni statut), bouton « Copier le prompt d'import ERP » (prospects sélectionnés, ou tous).
+### 1. Rechercher des prospects
+Le champ de requête est prérempli avec le dork preset :
+```
+"Créé par Local.fr" "Mettre à jour mon site internet" -site:local.fr
+```
+Choisis le nombre de pages (10 par défaut, ~10 résultats/page) puis **Lancer la recherche**. Les URLs sont dédupliquées par domaine enregistrable (`UNIQUE(domain)`), et un récap s'affiche : *N trouvés, X nouveaux, Y déjà connus*. Relancer la même recherche plus tard n'ajoute **que les nouveaux domaines** — idéal pour repasser régulièrement voir ce qu'il reste à démarcher. Les requêtes sont mémorisées (menu déroulant).
+
+### 2. Enrichir
+Trois boutons : **Enrichir tout** (les `pending`), **Enrichir la sélection** (cases cochées), **Réessayer les échecs**. Chaque site passe `en attente → fetch → parsing → ok/échec` avec une **barre de progression temps réel** (SSE). Un site en échec n'interrompt jamais le lot.
+
+- **Incrémental** : pas besoin de tout faire d'un coup. Enrichis par lots quand tu veux ; tout est sauvegardé en base au fur et à mesure. Ferme et relance l'app sans rien perdre.
+- **Anti-re-scraping** : un domaine enrichi il y a moins de `ENRICH_TTL_DAYS` (7 j) n'est pas ré-enrichi. Le bouton **↻ (forcer)** sur une ligne ignore ce délai.
+
+### 3. Trier / filtrer / travailler la base
+Le tableau est numéroté à gauche. Tri par colonne, filtre par colonne, recherche plein texte, pagination réglable (10 → 300 ou **Tout**). Le **statut commercial** est éditable en ligne (nouveau → à contacter → contacté → relance → RDV → client / pas intéressé). Le crayon **✎** ouvre le drawer détail (toutes les données, sources d'extraction, problèmes SEO, notes éditables). La croix **✕** supprime réellement la fiche (droit à l'effacement RGPD).
+
+### 4. Exporter / handoff ERP
+- **Export CSV** / **Export JSON** (toutes colonnes).
+- **Import CSV/JSON** en upsert par domaine : complète les champs vides **sans écraser** tes notes ni ton statut.
+- **Copier le prompt d'import ERP** : génère le prompt + le JSON des prospects (sélectionnés, ou tous) prêt à coller dans l'ERP FreelanceOS.
+
+## Données collectées par prospect
+
+| Catégorie | Champs |
+|---|---|
+| Identité | raison sociale, type d'activité, secteur, description |
+| Contact | prénom/nom du dirigeant (fondateur JSON-LD prioritaire), responsable de publication, emails, téléphones (FR normalisés), adresse, SIRET |
+| Site | type (vitrine/ecommerce/blog/landing), CMS (dont **local.fr/Solocal**), HTTPS, sitemap, nb de pages, **nb d'images**, **date de création du domaine** (RDAP) |
+| Qualité | **score SEO on-page 0-100** + liste des problèmes détectés (argumentaire de refonte), score performance mobile (PageSpeed, optionnel) |
+| Pipeline | statut commercial, notes |
+| Traçabilité | pour chaque champ : source + niveau de confiance (`high`/`medium`/`low`) |
+
+Le **score SEO** est calculé gratuitement depuis le HTML de la home (15 critères : titre, meta description, H1, viewport, HTTPS, canonical, Open Graph, données structurées, couverture des `alt`, sitemap, indexabilité…). Aucun appel réseau supplémentaire.
 
 ## Scripts
 
@@ -47,7 +79,14 @@ npm run dev               # http://localhost:3000
 | `npm run db:push` | Applique le schéma Drizzle sur `prospects.db` |
 | `npm run db:studio` | Explorateur de base Drizzle Studio |
 | `npm run typecheck` | `tsc --noEmit` |
-| `npx tsx scripts/smoke-test.ts` | Smoke test des extracteurs + pipeline complet |
+| `npm run test:smoke` | Smoke test des extracteurs + pipeline complet |
+| `npm run test:import` | Test de l'upsert import/export (notes/statut préservés) |
+| `npx tsx scripts/e2e-live.ts [--no-search] [--force]` | E2E réel (consomme des crédits Serper) |
+
+## Branches & contribution
+
+- `main` : branche stable (releases).
+- `dev` : développement des évolutions. Travailler sur `dev`, puis merger dans `main` pour une release.
 
 ## Architecture
 
